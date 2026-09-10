@@ -15,6 +15,8 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Public+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
+  <!-- Preload the 3D model so the browser fetches it in parallel with scripts -->
+  <link rel="preload" href="./black_hole.glb?v=8" as="fetch" crossorigin="anonymous">
   <style>
     /* ============================= TOKENS ============================= */
     :root {
@@ -1420,6 +1422,166 @@
       transform: scale(1.05);
       box-shadow: 0 10px 30px rgba(227, 162, 94, 0.4);
     }
+
+    /* ============================= MOBILE LANDSCAPE ============================= */
+    /* Targets phones held sideways: wide but very short (< 500px tall) */
+    @media (orientation: landscape) and (max-height: 500px) {
+
+      /* Loader — shrink mark and reduce gap */
+      #loader {
+        gap: 0.8rem;
+      }
+
+      .loader-mark {
+        width: 44px;
+        height: 44px;
+      }
+
+      .loader-hint {
+        display: none;
+      }
+
+      /* Nav — tighter vertical padding */
+      #nav {
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+      }
+
+      /* Hero — scale everything down to fit short viewport */
+      .hero-name {
+        font-size: clamp(2rem, 9vh, 3.8rem) !important;
+      }
+
+      .intro-pre {
+        margin-bottom: 0.4rem;
+        font-size: 0.68rem;
+      }
+
+      .hero-name-wrap {
+        margin-bottom: 0.6rem;
+      }
+
+      .hero-role {
+        margin-bottom: 0.4rem;
+        font-size: 0.75rem;
+      }
+
+      .hero-tagline {
+        display: none;
+      }
+
+      .hero-ctas {
+        gap: 0.5rem;
+        margin-top: 0;
+      }
+
+      .btn {
+        padding: 0.7em 1.4em;
+        font-size: 0.62rem;
+      }
+
+      /* Scroll hint — move up, make smaller */
+      #scroll-hint {
+        bottom: 0.5rem;
+      }
+
+      #scroll-hint .scroll-btn {
+        width: 16px;
+        height: 24px;
+      }
+
+      #scroll-hint .scroll-btn::after {
+        display: none;
+      }
+
+      /* Scenes — reduce top padding so content is visible */
+      .scene-inner {
+        padding-top: 2.5rem;
+      }
+
+      .scene-heading {
+        font-size: clamp(1.6rem, 6vh, 3rem);
+        line-height: 1;
+      }
+
+      .scene-body {
+        font-size: 0.85rem;
+        line-height: 1.55;
+      }
+
+      /* Skills — force smaller tiles in landscape */
+      .techstack-item {
+        width: 38px !important;
+        height: 44px !important;
+        padding: 3px !important;
+        border-radius: 7px !important;
+      }
+
+      .techstack-item img {
+        width: 18px !important;
+        height: 18px !important;
+      }
+
+      .techstack-item span {
+        display: none !important;
+      }
+
+      .techstack-pyramid {
+        gap: 5px !important;
+      }
+
+      .techstack-row {
+        gap: 5px !important;
+      }
+
+      .skills-head {
+        margin-bottom: 0.3rem !important;
+      }
+
+      /* Work section */
+      .work-container {
+        padding-top: 2.5rem;
+      }
+
+      .work-container h2 {
+        font-size: clamp(1.8rem, 5vh, 3rem);
+        margin-bottom: 0.5rem;
+      }
+
+      .work-box {
+        padding: 20px;
+        gap: 12px;
+      }
+
+      .work-image img {
+        max-height: clamp(80px, 20vh, 160px);
+      }
+
+      /* Contact */
+      .contact-huge {
+        font-size: clamp(1.8rem, 6vh, 3.5rem);
+      }
+
+      .contact-sub {
+        font-size: 0.85rem;
+        margin: 0.8rem 0 1.2rem;
+      }
+
+      /* Timeline */
+      .timeline-node {
+        margin-bottom: 1rem;
+      }
+
+      .timeline-node h3 {
+        font-size: 1.05rem;
+      }
+
+      /* Journey columns — keep side-by-side in landscape */
+      .journey-columns {
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 1.5rem;
+      }
+    }
   </style>
 </head>
 
@@ -1427,11 +1589,12 @@
 
   <div id="loader" aria-hidden="true">
     <div class="loader-mark"></div>
-    <div class="loader-label">Initializing experience</div>
+    <div class="loader-label">Loading scene</div>
     <div class="loader-bar">
       <div class="loader-bar-fill" id="loader-bar-fill"></div>
     </div>
     <div class="loader-pct" id="loader-pct">0%</div>
+    <div class="loader-hint" style="font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;color:var(--ink-faint);text-transform:uppercase;margin-top:.2rem;">First visit may take a moment</div>
   </div>
 
   <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -1859,7 +2022,8 @@
 
       var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       var isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-      function isNarrow() { return window.innerWidth <= 820; }
+      /* isNarrow: true on small-width screens OR short landscape viewports (phones rotated sideways) */
+      function isNarrow() { return window.innerWidth <= 820 || (window.innerHeight <= 500 && window.innerWidth > window.innerHeight); }
 
       /* ---------------- DOM refs ---------------- */
       var canvas = document.getElementById('bg-canvas');
@@ -2064,8 +2228,9 @@
           playIntro();
         });
       }
-      /* safety net: never let the loader get stuck, regardless of network/model state */
-      setTimeout(startExperience, 15000);
+      /* safety net: reveal content at 8 s even if the 3D model hasn't finished loading.
+         The model will fade in smoothly once ready (see modelReady flag in animate loop). */
+      setTimeout(startExperience, 8000);
 
       function playIntro() {
         introStartTime = performance.now();
